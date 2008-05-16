@@ -87,6 +87,8 @@ class GmailController:
 
         else:
             view.no_mail()
+
+        return True
          
     def on_menu_popup(self, widget, button, time, menu):
         if button == 3:
