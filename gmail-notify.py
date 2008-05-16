@@ -15,7 +15,7 @@ class GmailView:
     def __init__(self, control):
         self.control = control
 
-        self.mail_items = []
+        self.mail_items = {}
         
         """Set-up Menu"""
         self.menu = gtk.Menu()
@@ -39,16 +39,31 @@ class GmailView:
 
         self.control.check_mail(self)
         
-        gobject.timeout_add(5 * 60 * 1000, self.control.check_mail, self)
+        gobject.timeout_add(30 * 1000, self.control.check_mail, self)
 
     """Set icon, and take dictionary to build menu items."""
     def new_mail(self, list):
         list.reverse()
+        
+        new_email_urls = []
         for email in list:
-            item = GmailMessageItem(email['summary'], email['url'])
-            item.connect('activate', self.control.open_email)
-            self.menu.prepend(item)
-            self.mail_items.append(item)
+            new_email_urls.append(email['url'])
+            """Prevents duplicates"""
+            if email['url'] not in self.mail_items:
+                item = GmailMessageItem(email['summary'], email['url'])
+                item.connect('activate', self.control.open_email)
+                self.menu.prepend(item)
+                self.mail_items[email['url']] = item
+
+        to_delete = []
+        
+        for url in self.mail_items:
+            if url not in new_email_urls:
+                to_delete.append(url)
+
+        for url in to_delete:
+            self.menu.remove(self.mail_items[url])
+            del self.mail_items[url]
 
         print "New Mail" + " (" + str(datetime.datetime.now()) + ")"
         self.status_icon.set_tooltip('New Mail')
@@ -56,8 +71,11 @@ class GmailView:
 
     """Set icon, and remove all menu items besides About and Quit."""
     def no_mail(self):
-        for item in self.mail_items:
-            self.menu.remove(item)
+        items = self.mail_items
+        for item in items:
+            self.menu.remove(self.mail_items[item])
+
+        self.mail_items = {}
 
         print "No Mail" + " (" + str(datetime.datetime.now()) + ")"
         self.status_icon.set_tooltip('No Mail')
