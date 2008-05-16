@@ -102,17 +102,6 @@ class GmailController:
         webbrowser.open_new_tab('http://mail.google.com/mail')
 
 
-class GmailMessageBuilder:
-
-    def build_label_url_dict(self, feed):
-        dict = {}
-        for entry in feed.entries:
-            value = entry.author_detail.name + ': ' + entry.title
-            dict[entry.link] = value
-
-        return dict
-
-
 class GmailChecker:
 
     feed_realm = 'New mail feed'
