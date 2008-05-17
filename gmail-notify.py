@@ -15,7 +15,9 @@ class GmailView:
     def __init__(self, control):
         self.control = control
 
-        self.mail_items = {}
+        self.menu_items = {}
+
+        check_interval = 5 * 60 * 1000
         
         """Set-up Menu"""
         self.menu = gtk.Menu()
@@ -37,49 +39,12 @@ class GmailView:
 
         self.status_icon.connect('activate', self.control.go_to_inbox)
 
-        self.control.check_mail(self)
+        self.control.check_mail(self.menu, self.menu_items,
+                                self.status_icon)
         
-        gobject.timeout_add(30 * 1000, self.control.check_mail, self)
-
-    """Set icon, and take dictionary to build menu items."""
-    def new_mail(self, list):
-        list.reverse()
-        
-        new_email_urls = []
-        for email in list:
-            new_email_urls.append(email['url'])
-            """Prevents duplicates"""
-            if email['url'] not in self.mail_items:
-                item = GmailMessageItem(email['summary'], email['url'])
-                item.connect('activate', self.control.open_email)
-                self.menu.prepend(item)
-                self.mail_items[email['url']] = item
-
-        to_delete = []
-        
-        for url in self.mail_items:
-            if url not in new_email_urls:
-                to_delete.append(url)
-
-        for url in to_delete:
-            self.menu.remove(self.mail_items[url])
-            del self.mail_items[url]
-
-        print "New Mail" + " (" + str(datetime.datetime.now()) + ")"
-        self.status_icon.set_tooltip('New Mail')
-        self.status_icon.set_from_file('unread.ico')
-
-    """Set icon, and remove all menu items besides About and Quit."""
-    def no_mail(self):
-        items = self.mail_items
-        for item in items:
-            self.menu.remove(self.mail_items[item])
-
-        self.mail_items = {}
-
-        print "No Mail" + " (" + str(datetime.datetime.now()) + ")"
-        self.status_icon.set_tooltip('No Mail')
-        self.status_icon.set_from_file('no_new.ico') 
+        gobject.timeout_add(check_interval, self.control.check_mail,
+                            self.menu, self.menu_items,
+                            self.status_icon)
 
 
 class GmailController:
@@ -87,26 +52,70 @@ class GmailController:
     def __init__(self):
         self.gmail = GmailChecker()
     
-    def check_mail(self, view):
+    def check_mail(self, menu, menu_items, icon):
         feed = self.gmail.feed()
         
         if len(feed.entries) > 0:
             list = []
 
-            """Reversing list so that when added to menu they are in
-            correct order."""
             for entry in feed.entries:
                 value = entry.author_detail.name + ': ' + entry.title
                 url = entry.link
                 email = {'summary': value, 'url': url}
                 list.append(email)
+
+            list.reverse()
             
-            view.new_mail(list)
+            self.new_mail(list, menu, menu_items, icon)
 
         else:
-            view.no_mail()
+            self.no_mail(menu, menu_items, icon)
 
         return True
+
+    def new_mail(self, list, menu, menu_items, icon):
+        print
+        menu_url_list = []
+        for url in menu_items:
+            menu_url_list.append(url)
+
+        feed_url_list = []
+        for email in list:
+            feed_url_list.append(email['url'])
+
+        menu_set, feed_set = set(menu_url_list), set(feed_url_list)
+        to_remove = menu_set - feed_set
+        to_add = feed_set - menu_set
+
+        if to_add:
+            for email in list:
+                if email['url'] in to_add:
+                    print email['summary']
+                    item = GmailMessageItem(email['summary'], email['url'])
+                    item.connect('activate', self.open_email)
+                    menu.prepend(item)
+                    menu_items[email['url']] = item
+
+        if to_remove:
+            for url in to_remove:
+                menu.remove(menu_items[url])
+                del menu_items[url]
+
+        print "New Mail" + " (" + str(datetime.datetime.now()) + ")"
+        icon.set_tooltip('New Mail')
+        icon.set_from_file('unread.ico')
+
+
+    def no_mail(self, menu, menu_items, icon):
+        print
+        for item in menu_items:
+            menu.remove(menu_items[item])
+
+        menu_items = {}
+
+        print "No Mail" + " (" + str(datetime.datetime.now()) + ")"
+        icon.set_tooltip('No Mail')
+        icon.set_from_file('no_new.ico') 
          
     def on_menu_popup(self, widget, button, time, menu):
         if button == 3:
